@@ -49,7 +49,6 @@ interface GetTasksInput {
 export const getTasks = async (data: GetTasksInput) => {
   const { userId, page, limit, status, search, sort, order } = data;
 
-  // 1. Build dynamic where clause
   const where: Prisma.TaskWhereInput = {
     ownerId: userId,
     isDeleted: false,
@@ -66,7 +65,6 @@ export const getTasks = async (data: GetTasksInput) => {
     ];
   }
 
-  // 2. Build dynamic sort clause (default to createdAt)
   const validSortFields = ["createdAt", "updatedAt", "title", "status"];
   const sortField = validSortFields.includes(sort || "") ? sort : "createdAt";
 
@@ -74,7 +72,6 @@ export const getTasks = async (data: GetTasksInput) => {
     [sortField as string]: order || "desc",
   };
 
-  // 3. Execute findMany and count in parallel for performance
   const [tasks, total] = await Promise.all([
     prisma.task.findMany({
       where,
@@ -94,4 +91,63 @@ export const getTasks = async (data: GetTasksInput) => {
       totalPages: Math.ceil(total / limit),
     },
   };
+};
+
+interface UpdateTaskInput {
+  title?: string | undefined;
+  description?: string | null | undefined;
+}
+
+export const updateTask = async (
+  userId: string,
+  publicId: string,
+  data: UpdateTaskInput,
+) => {
+  const task = await prisma.task.findFirst({
+    where: { publicId, ownerId: userId, isDeleted: false },
+  });
+
+  if (!task) {
+    throw new AppError("Task not found", 404);
+  }
+  const payload: { title?: string; description?: string | null } = {};
+  if (data.title !== undefined) payload.title = data.title;
+  if (data.description !== undefined) payload.description = data.description;
+
+  const updatedTask = await prisma.task.update({
+    where: { id: task.id },
+    data: payload,
+  });
+
+  return updatedTask;
+};
+
+export const deleteTask = async (userId: string, publicId: string) => {
+  const task = await prisma.task.findFirst({
+    where: { publicId, ownerId: userId, isDeleted: false },
+  });
+
+  if (!task) {
+    throw new AppError("Task not found", 404);
+  }
+
+  // 1. Soft delete the task
+  await prisma.task.update({
+    where: { id: task.id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+    },
+  });
+
+  // 2. Record in TaskHistory
+  await prisma.taskHistory.create({
+    data: {
+      taskId: task.id,
+      action: "DELETED",
+      previousStatus: task.status,
+      currentStatus: task.status,
+      performedById: userId,
+    },
+  });
 };
