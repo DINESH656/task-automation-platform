@@ -19,6 +19,8 @@ const envSchema = z.object({
   REFRESH_TOKEN_EXPIRES_IN: z.string(),
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().min(8).max(15),
+
+  REDIS_URL: z.string().url().default("redis://localhost:6379"),
 });
 
 export const env = envSchema.parse(process.env);
