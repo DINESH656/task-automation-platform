@@ -7,6 +7,7 @@ import {
   getTasks,
   updateTask,
   deleteTask,
+  retryTask,
 } from "./task.service.js";
 import { AppError } from "../../common/errors/AppErrors.js";
 
@@ -105,6 +106,26 @@ export const deleteTaskController = AsyncHandler(
     return res.status(200).json({
       success: true,
       message: "Task deleted successfully",
+    });
+  },
+);
+
+export const retryTaskController = AsyncHandler(
+  async (req: Request, res: Response) => {
+    const publicId = Array.isArray(req.params.publicId)
+      ? req.params.publicId[0]
+      : req.params.publicId;
+
+    if (!publicId) {
+      throw new AppError("task publicId is required", 400);
+    }
+
+    const task = await retryTask(req.user.id, publicId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Task queued for retry",
+      data: task,
     });
   },
 );

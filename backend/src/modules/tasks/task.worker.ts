@@ -26,34 +26,58 @@ export const taskWorker = new Worker(
       },
     });
 
-    // 2. Simulate async work (e.g., transcoding video, generating report)
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    try {
+      // 2. Simulate async work
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // 3. Update to COMPLETED & save history
-    await prisma.task.update({
-      where: { id: taskId },
-      data: {
-        status: "COMPLETED",
-        completedAt: new Date(),
-      },
-    });
+      // Fake failure condition for testing: if title contains "fail"
+      if (task.title.toLowerCase().includes("fail")) {
+        throw new Error("Simulated processing error");
+      }
 
-    await prisma.taskHistory.create({
-      data: {
-        taskId,
-        action: "STATUS_CHANGED",
-        previousStatus: "PROCESSING",
-        currentStatus: "COMPLETED",
-        performedById: task.ownerId,
-      },
-    });
+      // 3. Update to COMPLETED & save history
+      await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
+      });
+
+      await prisma.taskHistory.create({
+        data: {
+          taskId,
+          action: "STATUS_CHANGED",
+          previousStatus: "PROCESSING",
+          currentStatus: "COMPLETED",
+          performedById: task.ownerId,
+        },
+      });
+    } catch (error) {
+      // 4. Handle Failure: Update to FAILED & save history
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "FAILED" },
+      });
+
+      await prisma.taskHistory.create({
+        data: {
+          taskId,
+          action: "STATUS_CHANGED",
+          previousStatus: "PROCESSING",
+          currentStatus: "FAILED",
+          performedById: task.ownerId,
+        },
+      });
+
+      throw error; // Re-throw so BullMQ also knows it failed
+    }
 
     return { success: true };
   },
   { connection: redisConnection },
 );
 
-// Optional: Log worker errors
 taskWorker.on("failed", (job, err) => {
   console.error(`Job ${job?.id} failed with error ${err.message}`);
 });

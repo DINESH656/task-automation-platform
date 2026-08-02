@@ -151,3 +151,51 @@ export const deleteTask = async (userId: string, publicId: string) => {
     },
   });
 };
+
+export const retryTask = async (userId: string, publicId: string) => {
+  const task = await prisma.task.findFirst({
+    where: { publicId, ownerId: userId, isDeleted: false },
+  });
+
+  if (!task) {
+    throw new AppError("Task not found", 404);
+  }
+
+  if (task.status !== "FAILED") {
+    throw new AppError("Only failed tasks can be retried", 400);
+  }
+
+  if (task.retryCount >= task.maxRetries) {
+    throw new AppError("Maximum retry limit reached", 400);
+  }
+
+  // 1. Increment retry count and reset status to PENDING
+  const updatedTask = await prisma.task.update({
+    where: { id: task.id },
+    data: {
+      status: "PENDING",
+      retryCount: {
+        increment: 1,
+      },
+      completedAt: null,
+    },
+  });
+
+  // 2. Record in history
+  await prisma.taskHistory.create({
+    data: {
+      taskId: task.id,
+      action: "RETRIED",
+      previousStatus: "FAILED",
+      currentStatus: "PENDING",
+      performedById: userId,
+    },
+  });
+
+  // 3. Push back to the BullMQ queue
+  await taskQueue.add("process-task", {
+    taskId: task.id,
+  });
+
+  return updatedTask;
+};
