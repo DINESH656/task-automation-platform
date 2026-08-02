@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Request, Response } from "express";
 
 import { AsyncHandler } from "../../common/errors/AsyncHandler.js";
-import { createTask } from "./task.service.js";
+import { createTask, getTasks } from "./task.service.js";
 
 const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(255),
@@ -28,5 +28,31 @@ export const createTaskController = AsyncHandler(
       message: "Task created successfully",
       data: task,
     });
-  }
+  },
+);
+
+const getTasksSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10),
+  status: z.enum(["PENDING", "PROCESSING", "COMPLETED", "FAILED"]).optional(),
+  search: z.string().trim().optional(),
+  sort: z.string().optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+});
+
+export const getTasksController = AsyncHandler(
+  async (req: Request, res: Response) => {
+    const parsedQuery = getTasksSchema.parse(req.query);
+
+    const result = await getTasks({
+      userId: req.user.id,
+      ...parsedQuery,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+    });
+  },
 );
