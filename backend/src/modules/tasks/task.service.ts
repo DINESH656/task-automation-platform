@@ -199,3 +199,35 @@ export const retryTask = async (userId: string, publicId: string) => {
 
   return updatedTask;
 };
+
+
+export const getTaskStats = async (userId: string) => {
+  const stats = await prisma.task.groupBy({
+    by: ["status"],
+    where: {
+      ownerId: userId,
+      isDeleted: false,
+    },
+    _count: {
+      status: true,
+    },
+  });
+
+  const formattedStats = {
+    PENDING: 0,
+    PROCESSING: 0,
+    COMPLETED: 0,
+    FAILED: 0,
+  };
+
+  stats.forEach((stat) => {
+    formattedStats[stat.status] = stat._count.status;
+  });
+
+  const totalTasks = Object.values(formattedStats).reduce((a, b) => a + b, 0);
+
+  return {
+    totalTasks,
+    ...formattedStats,
+  };
+};

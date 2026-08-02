@@ -6,6 +6,7 @@ import {
   updateTaskController,
   deleteTaskController,
   retryTaskController,
+  getTaskStatsController,
 } from "./task.controller.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 
@@ -22,5 +23,6 @@ router.patch("/:publicId", updateTaskController);
 router.delete("/:publicId", deleteTaskController);
 
 router.post("/:publicId/retry", retryTaskController);
+router.get("/stats", getTaskStatsController);
 
 export default router;

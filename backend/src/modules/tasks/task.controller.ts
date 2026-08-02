@@ -8,6 +8,7 @@ import {
   updateTask,
   deleteTask,
   retryTask,
+  getTaskStats,
 } from "./task.service.js";
 import { AppError } from "../../common/errors/AppErrors.js";
 
@@ -126,6 +127,18 @@ export const retryTaskController = AsyncHandler(
       success: true,
       message: "Task queued for retry",
       data: task,
+    });
+  },
+);
+// Update imports at top:
+
+export const getTaskStatsController = AsyncHandler(
+  async (req: Request, res: Response) => {
+    const stats = await getTaskStats(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      data: stats,
     });
   },
 );
