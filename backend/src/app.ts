@@ -4,10 +4,12 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import routes from "./routes/index.js";
 
 // Fix: Import the named export
-import { errorMiddleware } from "./middlewares/error.middleware.js"; 
+import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app = express();
 
@@ -20,11 +22,14 @@ app.use(
   cors({
     origin: true,
     credentials: true,
-  })
+  }),
 );
 
 app.use(compression());
 app.use(morgan("dev"));
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use("/uploads", express.static(path.resolve(__dirname, "../../uploads")));
 
 // Routes
 app.use("/api/v1", routes);
