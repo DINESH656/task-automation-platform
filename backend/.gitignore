@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Build
+dist/
+
+# Prisma
+generated/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# AI Tools
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
