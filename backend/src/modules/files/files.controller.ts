@@ -1,39 +1,40 @@
+import { z } from "zod";
 import type { Request, Response } from "express";
 import { AsyncHandler } from "../../common/errors/AsyncHandler.js";
 import { AppError } from "../../common/errors/AppErrors.js";
-import { uploadFile } from "./files.service.js";
+import { uploadFiles } from "./files.service.js";
+
+const publicIdSchema = z.object({
+  publicId: z.string().min(1),
+});
 
 export const uploadFileController = AsyncHandler(
   async (req: Request, res: Response) => {
-    if (!req.file) {
-      throw new AppError("No file uploaded", 400);
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      throw new AppError("No files uploaded", 400);
     }
 
-    const publicId = Array.isArray(req.params.publicId)
-      ? req.params.publicId[0]
-      : req.params.publicId;
+    // 1. Validate the route parameter safely
+    const { publicId } = publicIdSchema.parse(req.params);
 
-    if (!publicId) {
-      throw new AppError("Task publicId is required", 400);
-    }
-
-    // Construct the public URL (in production, this would be S3 bucket URL)
-    const publicUrl = `/uploads/${req.file.filename}`;
-
-    const file = await uploadFile({
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      storageKey: req.file.filename,
-      publicUrl,
+    const filesData = files.map((file) => ({
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      storageKey: file.filename,
+      publicUrl: `/uploads/${file.filename}`,
       taskId: publicId,
       userId: req.user.id,
-    });
+    }));
+
+    const uploadedFiles = await uploadFiles(filesData);
 
     return res.status(201).json({
       success: true,
-      message: "File uploaded successfully",
-      data: file,
+      message: "Files uploaded successfully",
+      data: uploadedFiles,
     });
   },
 );

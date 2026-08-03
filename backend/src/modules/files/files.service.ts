@@ -6,40 +6,57 @@ interface UploadFileInput {
   originalName: string;
   mimeType: string;
   size: number;
-  storageKey: string; // The generated filename on disk
-  publicUrl: string; // The URL to access it
+  storageKey: string;
+  publicUrl: string;
   taskId: string;
   userId: string;
 }
 
-export const uploadFile = async (data: UploadFileInput) => {
-  // Verify task exists and belongs to user
+export const uploadFiles = async (data: UploadFileInput[]) => {
+  if (data.length === 0) {
+    throw new AppError("No files provided", 400);
+  }
+
+  // Safely extract the first element to satisfy noUncheckedIndexedAccess
+  const firstFile = data[0];
+  if (!firstFile) {
+    throw new AppError("Invalid file data", 400);
+  }
+
+  const taskPublicId = firstFile.taskId;
+  const userId = firstFile.userId;
+
   const task = await prisma.task.findFirst({
-    where: { publicId: data.taskId, ownerId: data.userId, isDeleted: false },
+    where: { publicId: taskPublicId, ownerId: userId, isDeleted: false },
   });
 
   if (!task) {
     throw new AppError("Task not found", 404);
   }
 
-  const publicId = "FILE-" + randomBytes(3).toString("hex").toUpperCase();
+  const createdFiles = await Promise.all(
+    data.map(async (file) => {
+      const publicId = "FILE-" + randomBytes(3).toString("hex").toUpperCase();
 
-  const file = await prisma.file.create({
-    data: {
-      publicId,
-      originalName: data.originalName,
-      storageKey: data.storageKey,
-      publicUrl: data.publicUrl,
-      mimeType: data.mimeType,
-      size: BigInt(data.size),
-      uploadedById: data.userId,
-      taskId: task.id,
-    },
-  });
+      const createdFile = await prisma.file.create({
+        data: {
+          publicId,
+          originalName: file.originalName,
+          storageKey: file.storageKey,
+          publicUrl: file.publicUrl,
+          mimeType: file.mimeType,
+          size: BigInt(file.size),
+          uploadedById: userId,
+          taskId: task.id,
+        },
+      });
 
-  // Convert BigInt to string for JSON response
-  return {
-    ...file,
-    size: file.size.toString(),
-  };
+      return {
+        ...createdFile,
+        size: createdFile.size.toString(),
+      };
+    }),
+  );
+
+  return createdFiles;
 };

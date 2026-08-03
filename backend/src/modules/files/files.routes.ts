@@ -9,7 +9,7 @@ const router = Router();
 router.post(
   "/tasks/:publicId/files",
   authenticate,
-  upload.single("file"), // Multer middleware to expect a single file under 'file' key
+  upload.array("files", 10), // Multer middleware to expect a single file under 'file' key
   uploadFileController,
 );
 
